@@ -45,6 +45,7 @@ export default function WelcomeScreen() {
         mode="outlined"
         label="Name"
         placeholder="Your name"
+        nativeID="welcome-name"
         value={name}
         onChangeText={setName}
         style={styles.input}
@@ -53,6 +54,7 @@ export default function WelcomeScreen() {
         mode="outlined"
         label="Location"
         placeholder="City or campus"
+        nativeID="welcome-location"
         value={location}
         onChangeText={setLocation}
         style={styles.input}
