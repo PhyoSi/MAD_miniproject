@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Button, Text } from 'react-native-paper';
+import { Button, Text, TextInput } from 'react-native-paper';
 import { useLocalSearchParams } from 'expo-router';
 import NetInfo from '@react-native-community/netinfo';
 
@@ -18,9 +18,12 @@ export default function AddSessionScreen() {
   const { hobbies, addSession, isLoading } = useHobbyStore();
   const [selectedHobbyId, setSelectedHobbyId] = useState<string | null>(hobbyId ?? null);
   const [date, setDate] = useState(new Date());
+  const [dateInput, setDateInput] = useState(() => toIsoDateString(new Date()));
+  const [showPicker, setShowPicker] = useState(false);
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(30);
   const [isOnline, setIsOnline] = useState(true);
+  const isWeb = Platform.OS === 'web';
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -48,7 +51,7 @@ export default function AddSessionScreen() {
       return;
     }
 
-    const isoDate = toIsoDateString(date);
+    const isoDate = isWeb ? dateInput : toIsoDateString(date);
     if (!validateSessionDate(isoDate)) {
       Alert.alert('Invalid date', 'Choose a valid date not in the future.');
       return;
@@ -92,13 +95,38 @@ export default function AddSessionScreen() {
       />
 
       <Text style={styles.sectionLabel}>Date</Text>
-      <DateTimePicker
-        value={date}
-        mode="date"
-        maximumDate={new Date()}
-        onChange={(_, selectedDate) => setDate(selectedDate ?? date)}
-        display={Platform.select({ ios: 'spinner', android: 'default' })}
-      />
+      {isWeb ? (
+        <TextInput
+          mode="outlined"
+          placeholder="YYYY-MM-DD"
+          value={dateInput}
+          onChangeText={setDateInput}
+          style={styles.input}
+        />
+      ) : (
+        <View>
+          <Button mode="outlined" onPress={() => setShowPicker(true)}>
+            {toIsoDateString(date)}
+          </Button>
+          {showPicker ? (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              maximumDate={new Date()}
+              onChange={(_, selectedDate) => {
+                if (selectedDate) {
+                  setDate(selectedDate);
+                  setDateInput(toIsoDateString(selectedDate));
+                }
+                if (Platform.OS === 'android') {
+                  setShowPicker(false);
+                }
+              }}
+              display={Platform.select({ ios: 'spinner', android: 'default' })}
+            />
+          ) : null}
+        </View>
+      )}
 
       <Text style={styles.sectionLabel}>Duration</Text>
       <View style={styles.durationRow}>
@@ -146,6 +174,10 @@ const styles = StyleSheet.create({
     ...fonts.label,
     color: colors.text,
     marginTop: 16,
+  },
+  input: {
+    marginTop: 8,
+    backgroundColor: colors.surface,
   },
   hobbyList: {
     gap: 10,
