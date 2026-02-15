@@ -1,5 +1,5 @@
 import { Platform, StyleSheet, View } from 'react-native';
-import { Card, Text } from 'react-native-paper';
+import { Card, IconButton, Text } from 'react-native-paper';
 
 import type { SessionWithHobby } from '@/src/types';
 import { colors, fonts } from '@/src/constants/theme';
@@ -23,11 +23,14 @@ export default function SessionCard({ session, onDelete, disabled }: SessionCard
         <Text style={styles.duration}>{session.durationMinutes} min</Text>
         {onDelete ? (
           <Card.Actions>
-            <Text
-              style={[styles.delete, disabled && styles.disabled]}
-              onPress={!disabled ? onDelete : undefined}>
-              Delete
-            </Text>
+            <IconButton
+              icon="delete-outline"
+              size={18}
+              iconColor={colors.error}
+              disabled={disabled}
+              onPress={onDelete}
+              style={styles.deleteButton}
+            />
           </Card.Actions>
         ) : null}
       </Card.Content>
@@ -66,9 +69,9 @@ const styles = StyleSheet.create({
     ...fonts.label,
     color: colors.secondary,
   },
-  delete: {
-    color: colors.error,
-    marginLeft: 8,
+  deleteButton: {
+    margin: 0,
+    marginLeft: 6,
   },
   disabled: {
     opacity: 0.4,

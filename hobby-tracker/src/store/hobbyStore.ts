@@ -17,7 +17,7 @@ interface HobbyStore {
 
   setUser: (user: User) => void;
   loadUserId: () => Promise<string | null>;
-  createUser: (name: string, location: string) => Promise<User>;
+  createUser: (name: string) => Promise<User>;
 
   loadHobbies: () => Promise<void>;
   addHobby: (name: string, icon: string) => Promise<Hobby>;
@@ -47,10 +47,10 @@ export const useHobbyStore = create<HobbyStore>((set, get) => ({
     return storedId;
   },
 
-  createUser: async (name: string, location: string) => {
+  createUser: async (name: string) => {
     try {
       set({ isLoading: true, error: null });
-      const user = await HobbyAPI.createUser(name, location);
+      const user = await HobbyAPI.createUser(name);
       await AsyncStorage.setItem(USER_ID_KEY, user.user_id);
       set({ user, userId: user.user_id, isLoading: false });
       return user;

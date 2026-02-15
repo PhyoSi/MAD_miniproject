@@ -1,4 +1,4 @@
-# HobbyIt - React Native TypeScript App - Complete Specification for GitHub Copilot
+# HobbyIt - React Native TypeScript App - Complete Specification
 
 ## Project Overview
 Build a React Native mobile app called "HobbyIt" that helps students track time spent on multiple hobbies and maintain practice streaks to stay motivated and organized.

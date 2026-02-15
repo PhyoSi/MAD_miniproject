@@ -18,7 +18,7 @@ export default function HobbyCard({ hobby, onPress }: HobbyCardProps) {
           <View style={styles.meta}>
             <Text style={styles.name}>{hobby.name}</Text>
             <Text style={styles.caption}>
-              {hobby.totalHours?.toFixed(1) ?? '0.0'} hrs • {hobby.currentStreak ?? 0} day streak
+              {hobby.totalHours?.toFixed(1) ?? '0.0'} hrs • {hobby.currentStreak ?? 0} day streak 🔥
             </Text>
           </View>
         </View>

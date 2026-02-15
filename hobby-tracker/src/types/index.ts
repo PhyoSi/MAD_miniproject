@@ -1,7 +1,6 @@
 export interface User {
   user_id: string;
   name: string;
-  location: string;
   created_at: string;
   hobbies: string[];
 }
@@ -51,3 +50,4 @@ export interface HobbyStats {
   currentStreak: number;
   longestStreak: number;
 }
+

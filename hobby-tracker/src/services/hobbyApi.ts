@@ -3,6 +3,7 @@ import {
   arrayRemove,
   arrayUnion,
   collection,
+  deleteField,
   deleteDoc,
   doc,
   getDoc,
@@ -41,7 +42,6 @@ function mapUser(id: string, data: Record<string, unknown>): User {
   return {
     user_id: id,
     name: (data.name as string) ?? '',
-    location: (data.location as string) ?? '',
     created_at: toIsoString(data.created_at),
     hobbies: (data.hobbies as string[]) ?? [],
   };
@@ -69,10 +69,9 @@ function mapSession(id: string, data: Record<string, unknown>): Session {
   };
 }
 
-export async function createUser(name: string, location: string): Promise<User> {
+export async function createUser(name: string): Promise<User> {
   const userRef = await addDoc(usersCollection, {
     name,
-    location,
     created_at: serverTimestamp(),
     hobbies: [],
   });
@@ -82,11 +81,20 @@ export async function createUser(name: string, location: string): Promise<User> 
 }
 
 export async function getUserProfile(userId: string): Promise<User> {
-  const userSnapshot = await getDoc(doc(usersCollection, userId));
+  const userRef = doc(usersCollection, userId);
+  const userSnapshot = await getDoc(userRef);
   if (!userSnapshot.exists()) {
     throw new Error('User not found');
   }
-  return mapUser(userSnapshot.id, userSnapshot.data());
+
+  const data = userSnapshot.data();
+  if ('location' in data) {
+    await updateDoc(userRef, {
+      location: deleteField(),
+    });
+  }
+
+  return mapUser(userSnapshot.id, data);
 }
 
 export async function getUserHobbies(userId: string): Promise<Hobby[]> {

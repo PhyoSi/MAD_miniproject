@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { Button, Text, TextInput } from 'react-native-paper';
+import { Button, TextInput } from 'react-native-paper';
 import { router } from 'expo-router';
 
-import { colors, fonts } from '@/src/constants/theme';
+import { ScreenTitleBlock } from '@/src/components';
+import { colors } from '@/src/constants/theme';
 import { useHobbyStore } from '@/src/store/hobbyStore';
 import { validateHobbyName } from '@/src/utils/validation';
 
 export default function WelcomeScreen() {
   const [name, setName] = useState('');
-  const [location, setLocation] = useState('');
   const isLoading = useHobbyStore(state => state.isLoading);
   const userId = useHobbyStore(state => state.userId);
   const createUser = useHobbyStore(state => state.createUser);
@@ -27,7 +27,7 @@ export default function WelcomeScreen() {
     }
 
     try {
-      await createUser(name.trim(), location.trim());
+      await createUser(name.trim());
       Alert.alert('Welcome!', 'Your profile is ready.');
       router.replace('/(tabs)/home');
     } catch (error) {
@@ -38,8 +38,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to HobbyIt</Text>
-      <Text style={styles.subtitle}>Track your practice time and streaks.</Text>
+      <ScreenTitleBlock title="Welcome to HobbyIt" subtitle="Track your practice time and streaks." />
 
       <TextInput
         mode="outlined"
@@ -48,15 +47,6 @@ export default function WelcomeScreen() {
         nativeID="welcome-name"
         value={name}
         onChangeText={setName}
-        style={styles.input}
-      />
-      <TextInput
-        mode="outlined"
-        label="Location"
-        placeholder="City or campus"
-        nativeID="welcome-location"
-        value={location}
-        onChangeText={setLocation}
         style={styles.input}
       />
 
@@ -73,16 +63,6 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: colors.background,
     justifyContent: 'center',
-  },
-  title: {
-    ...fonts.title,
-    color: colors.text,
-  },
-  subtitle: {
-    ...fonts.body,
-    marginTop: 8,
-    marginBottom: 24,
-    color: colors.textSecondary,
   },
   input: {
     marginBottom: 16,

@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { router, useLocalSearchParams } from 'expo-router';
 import NetInfo from '@react-native-community/netinfo';
 
-import OfflineBanner from '@/src/components/OfflineBanner';
-import LoadingSpinner from '@/src/components/LoadingSpinner';
-import SessionCard from '@/src/components/SessionCard';
-import StatCard from '@/src/components/StatCard';
-import EmptyState from '@/src/components/EmptyState';
+import {
+  HobbyDetailHeader,
+  HobbyStatsGrid,
+  LoadingSpinner,
+  OfflineBanner,
+  SessionListSection,
+} from '@/src/components';
 import { colors, fonts } from '@/src/constants/theme';
 import { useHobbyStore } from '@/src/store/hobbyStore';
 import * as HobbyAPI from '@/src/services/hobbyApi';
@@ -16,7 +18,7 @@ import type { HobbyStats, SessionWithHobby } from '@/src/types';
 
 export default function HobbyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { userId, hobbies } = useHobbyStore();
+  const { userId, hobbies, deleteSession } = useHobbyStore();
   const [stats, setStats] = useState<HobbyStats | null>(null);
   const [sessions, setSessions] = useState<SessionWithHobby[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,10 +78,33 @@ export default function HobbyDetailScreen() {
     ]);
   };
 
+  const handleDeleteSession = (sessionId: string) => {
+    Alert.alert('Delete session', 'Are you sure you want to delete this session?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            if (!isOnline) {
+              Alert.alert('Offline', 'Connect to the internet to delete sessions.');
+              return;
+            }
+            await deleteSession(sessionId);
+            await hydrate();
+          } catch (error) {
+            console.error('Error deleting session:', error);
+            Alert.alert('Error', 'Failed to delete session.');
+          }
+        },
+      },
+    ]);
+  };
+
   if (!hobby) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Hobby not found</Text>
+        <Text style={styles.notFoundTitle}>Hobby not found</Text>
       </View>
     );
   }
@@ -87,21 +112,11 @@ export default function HobbyDetailScreen() {
   return (
     <View style={styles.container}>
       <OfflineBanner visible={!isOnline} />
-      <View style={styles.header}>
-        <Text style={styles.icon}>{hobby.icon}</Text>
-        <Text style={styles.title}>{hobby.name}</Text>
-      </View>
+      <HobbyDetailHeader icon={hobby.icon} name={hobby.name} />
 
       {isLoading ? <LoadingSpinner /> : null}
 
-      <View style={styles.statsRow}>
-        <StatCard label="Total Hours" value={stats?.totalHours ?? 0} />
-        <StatCard label="Sessions" value={stats?.totalSessions ?? 0} />
-      </View>
-      <View style={styles.statsRow}>
-        <StatCard label="Current Streak" value={stats?.currentStreak ?? 0} />
-        <StatCard label="Longest Streak" value={stats?.longestStreak ?? 0} />
-      </View>
+      <HobbyStatsGrid stats={stats} />
 
       <Button
         mode="contained"
@@ -111,13 +126,13 @@ export default function HobbyDetailScreen() {
         Log Session
       </Button>
 
-      <Text style={styles.sectionTitle}>Recent Sessions</Text>
-      <FlatList
-        contentContainerStyle={styles.list}
-        data={sessions}
-        keyExtractor={item => item.id}
-        ListEmptyComponent={<EmptyState title="No sessions yet" description="Log your first session." />}
-        renderItem={({ item }) => <SessionCard session={item} />}
+      <SessionListSection
+        title="Recent Sessions"
+        sessions={sessions}
+        emptyTitle="No sessions yet"
+        emptyDescription="Log your first session."
+        isOnline={isOnline}
+        onDeleteSession={handleDeleteSession}
       />
 
       <Button mode="outlined" textColor={colors.error} onPress={handleDelete} disabled={!isOnline}>
@@ -133,33 +148,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     padding: 20,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  icon: {
-    fontSize: 48,
-  },
-  title: {
+  notFoundTitle: {
     ...fonts.title,
     color: colors.text,
-    marginTop: 8,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
   },
   logButton: {
     marginVertical: 12,
     backgroundColor: colors.primary,
-  },
-  sectionTitle: {
-    ...fonts.heading,
-    color: colors.text,
-    marginTop: 8,
-  },
-  list: {
-    paddingVertical: 12,
   },
 });
