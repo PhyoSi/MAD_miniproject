@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useLocalSearchParams } from 'expo-router';
-import NetInfo from '@react-native-community/netinfo';
 
 import {
   DateSelector,
@@ -12,8 +11,10 @@ import {
   ScreenTitleBlock,
 } from '@/src/components';
 import { colors } from '@/src/constants/theme';
+import { useOnlineStatus } from '@/src/hooks/use-online-status';
 import { useHobbyStore } from '@/src/store/hobbyStore';
 import { validateSessionDate, validateSessionDuration } from '@/src/utils/validation';
+import { showMessage } from '@/src/utils/appAlerts';
 import { toIsoDateString } from '@/src/utils/dateUtils';
 
 export default function AddSessionScreen() {
@@ -26,15 +27,7 @@ export default function AddSessionScreen() {
   const [dateInput, setDateInput] = useState(() => toIsoDateString(new Date()));
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(30);
-  const [isOnline, setIsOnline] = useState(true);
-
-  // Network status
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? false);
-    });
-    return () => unsubscribe();
-  }, []);
+  const isOnline = useOnlineStatus();
 
   // Pre-select hobby if passed via params
   useEffect(() => {
@@ -48,33 +41,33 @@ export default function AddSessionScreen() {
   const handleSave = async () => {
     // Validation
     if (!selectedHobbyId) {
-      Alert.alert('Missing hobby', 'Select a hobby to log a session.');
+      await showMessage('Missing hobby', 'Select a hobby to log a session.');
       return;
     }
 
     if (!validateSessionDuration(durationMinutes)) {
-      Alert.alert('Invalid duration', 'Duration must be between 1 and 1440 minutes.');
+      await showMessage('Invalid duration', 'Duration must be between 1 and 1440 minutes.');
       return;
     }
 
     const isoDate = dateInput;
     if (!validateSessionDate(isoDate)) {
-      Alert.alert('Invalid date', 'Choose a valid date not in the future.');
+      await showMessage('Invalid date', 'Choose a valid date not in the future.');
       return;
     }
 
     if (!isOnline) {
-      Alert.alert('Offline', 'Connect to the internet to add sessions.');
+      await showMessage('Offline', 'Connect to the internet to add sessions.');
       return;
     }
 
     // Save session
     try {
       await addSession(selectedHobbyId, isoDate, durationMinutes);
-      Alert.alert('Success', 'Session logged.');
+      await showMessage('Success', 'Session logged.');
     } catch (error) {
       console.error('Error adding session:', error);
-      Alert.alert('Error', 'Failed to log session.');
+      await showMessage('Error', 'Failed to log session.');
     }
   };
 

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors } from '@/src/constants/theme';
@@ -11,7 +11,11 @@ interface AddHobbyFabProps {
 export default function AddHobbyFab({ disabled, onPress }: AddHobbyFabProps) {
   return (
     <Pressable style={[styles.fab, disabled && styles.fabDisabled]} onPress={onPress} disabled={disabled}>
-      <Ionicons name="add" size={28} color="#FFFFFF" />
+      {Platform.OS === 'web' ? (
+        <Text style={styles.webPlus}>＋</Text>
+      ) : (
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      )}
     </Pressable>
   );
 }
@@ -30,5 +34,10 @@ const styles = StyleSheet.create({
   },
   fabDisabled: {
     opacity: 0.5,
+  },
+  webPlus: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    lineHeight: 28,
   },
 });

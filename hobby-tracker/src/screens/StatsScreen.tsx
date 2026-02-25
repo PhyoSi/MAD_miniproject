@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { useCallback } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import NetInfo from '@react-native-community/netinfo';
 
 import {
   MostLoggedCard,
@@ -11,47 +10,40 @@ import {
   StatsSummaryRow,
 } from '@/src/components';
 import { colors } from '@/src/constants/theme';
+import { useOnlineStatus } from '@/src/hooks/use-online-status';
 import { useHobbyStore } from '@/src/store/hobbyStore';
+import { showConfirmation, showMessage } from '@/src/utils/appAlerts';
 
 export default function StatsScreen() {
-  const { stats, sessions, loadStats, loadRecentSessions, deleteSession, isLoading } = useHobbyStore();
-  const [isOnline, setIsOnline] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? false);
-    });
-    return () => unsubscribe();
-  }, []);
+  const { userId, stats, sessions, loadStats, loadRecentSessions, deleteSession, isLoading } = useHobbyStore();
+  const isOnline = useOnlineStatus();
 
   useFocusEffect(
     useCallback(() => {
+      if (!userId) return;
       loadStats();
       loadRecentSessions(30);
-    }, [loadStats, loadRecentSessions])
+    }, [loadStats, loadRecentSessions, userId])
   );
 
-  const handleDeleteSession = (sessionId: string) => {
-    Alert.alert('Delete session', 'Are you sure you want to delete this session?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (!isOnline) {
-              Alert.alert('Offline', 'Connect to the internet to delete sessions.');
-              return;
-            }
-            await deleteSession(sessionId);
-            await Promise.all([loadStats(), loadRecentSessions(30)]);
-          } catch (error) {
-            console.error('Error deleting session:', error);
-            Alert.alert('Error', 'Failed to delete session.');
-          }
-        },
-      },
-    ]);
+  const handleDeleteSession = async (sessionId: string) => {
+    const confirmed = await showConfirmation(
+      'Delete session',
+      'Are you sure you want to delete this session?'
+    );
+    if (!confirmed) return;
+
+    try {
+      if (!isOnline) {
+        await showMessage('Offline', 'Connect to the internet to delete sessions.');
+        return;
+      }
+      await deleteSession(sessionId);
+      await Promise.all([loadStats(), loadRecentSessions(30)]);
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      await showMessage('Error', 'Failed to delete session.');
+    }
   };
 
   return (

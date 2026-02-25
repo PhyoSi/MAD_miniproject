@@ -1,26 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import NetInfo from '@react-native-community/netinfo';
 import { router } from 'expo-router';
 
 import { AddHobbyFab, HomeGreeting, HobbyListSection, LoadingSpinner, OfflineBanner } from '@/src/components';
 import { colors } from '@/src/constants/theme';
+import { useOnlineStatus } from '@/src/hooks/use-online-status';
 import { useHobbyStore } from '@/src/store/hobbyStore';
 import * as HobbyAPI from '@/src/services/hobbyApi';
 import type { Hobby } from '@/src/types';
+import { showMessage } from '@/src/utils/appAlerts';
 
 export default function HomeScreen() {
   const { user, userId, hobbies, isLoading, loadHobbies, setUser } = useHobbyStore();
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useOnlineStatus();
   const [statsMap, setStatsMap] = useState<Record<string, Hobby>>({});
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? false);
-    });
-    return () => unsubscribe();
-  }, []);
 
   const hydrateUser = useCallback(async () => {
     if (!userId) return;
@@ -84,7 +78,7 @@ export default function HomeScreen() {
 
   const handleAddHobby = () => {
     if (!isOnline) {
-      Alert.alert('Offline', 'Connect to the internet to add hobbies.');
+      void showMessage('Offline', 'Connect to the internet to add hobbies.');
       return;
     }
     router.push('/add-hobby');

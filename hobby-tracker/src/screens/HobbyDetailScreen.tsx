@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { router, useLocalSearchParams } from 'expo-router';
-import NetInfo from '@react-native-community/netinfo';
 
 import {
   HobbyDetailHeader,
@@ -12,9 +11,11 @@ import {
   SessionListSection,
 } from '@/src/components';
 import { colors, fonts } from '@/src/constants/theme';
+import { useOnlineStatus } from '@/src/hooks/use-online-status';
 import { useHobbyStore } from '@/src/store/hobbyStore';
 import * as HobbyAPI from '@/src/services/hobbyApi';
 import type { HobbyStats, SessionWithHobby } from '@/src/types';
+import { showConfirmation, showMessage } from '@/src/utils/appAlerts';
 
 export default function HobbyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,16 +23,9 @@ export default function HobbyDetailScreen() {
   const [stats, setStats] = useState<HobbyStats | null>(null);
   const [sessions, setSessions] = useState<SessionWithHobby[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useOnlineStatus();
 
   const hobby = useMemo(() => hobbies.find(item => item.id === id), [hobbies, id]);
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsOnline(state.isConnected ?? false);
-    });
-    return () => unsubscribe();
-  }, []);
 
   const hydrate = useCallback(async () => {
     if (!userId || !id) return;
@@ -54,51 +48,45 @@ export default function HobbyDetailScreen() {
     hydrate();
   }, [hydrate]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id) return;
-    Alert.alert('Delete hobby', 'This will remove the hobby and all its sessions.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (!isOnline) {
-              Alert.alert('Offline', 'Connect to the internet to delete hobbies.');
-              return;
-            }
-            await useHobbyStore.getState().deleteHobby(id);
-            router.back();
-          } catch (error) {
-            console.error('Error deleting hobby:', error);
-            Alert.alert('Error', 'Failed to delete hobby.');
-          }
-        },
-      },
-    ]);
+    const confirmed = await showConfirmation(
+      'Delete hobby',
+      'This will remove the hobby and all its sessions.'
+    );
+    if (!confirmed) return;
+
+    try {
+      if (!isOnline) {
+        await showMessage('Offline', 'Connect to the internet to delete hobbies.');
+        return;
+      }
+      await useHobbyStore.getState().deleteHobby(id);
+      router.back();
+    } catch (error) {
+      console.error('Error deleting hobby:', error);
+      await showMessage('Error', 'Failed to delete hobby.');
+    }
   };
 
-  const handleDeleteSession = (sessionId: string) => {
-    Alert.alert('Delete session', 'Are you sure you want to delete this session?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (!isOnline) {
-              Alert.alert('Offline', 'Connect to the internet to delete sessions.');
-              return;
-            }
-            await deleteSession(sessionId);
-            await hydrate();
-          } catch (error) {
-            console.error('Error deleting session:', error);
-            Alert.alert('Error', 'Failed to delete session.');
-          }
-        },
-      },
-    ]);
+  const handleDeleteSession = async (sessionId: string) => {
+    const confirmed = await showConfirmation(
+      'Delete session',
+      'Are you sure you want to delete this session?'
+    );
+    if (!confirmed) return;
+
+    try {
+      if (!isOnline) {
+        await showMessage('Offline', 'Connect to the internet to delete sessions.');
+        return;
+      }
+      await deleteSession(sessionId);
+      await hydrate();
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      await showMessage('Error', 'Failed to delete session.');
+    }
   };
 
   if (!hobby) {

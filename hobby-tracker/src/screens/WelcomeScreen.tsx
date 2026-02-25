@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Button, TextInput } from 'react-native-paper';
 import { router } from 'expo-router';
 
 import { ScreenTitleBlock } from '@/src/components';
 import { colors } from '@/src/constants/theme';
 import { useHobbyStore } from '@/src/store/hobbyStore';
+import { showMessage } from '@/src/utils/appAlerts';
 import { validateHobbyName } from '@/src/utils/validation';
 
 export default function WelcomeScreen() {
@@ -22,17 +23,17 @@ export default function WelcomeScreen() {
 
   const handleSubmit = async () => {
     if (!validateHobbyName(name)) {
-      Alert.alert('Invalid name', 'Please enter at least 2 characters.');
+      await showMessage('Invalid name', 'Please enter at least 2 characters.');
       return;
     }
 
     try {
       await createUser(name.trim());
-      Alert.alert('Welcome!', 'Your profile is ready.');
+      await showMessage('Welcome!', 'Your profile is ready.');
       router.replace('/(tabs)/home');
     } catch (error) {
       console.error('Error creating user:', error);
-      Alert.alert('Error', 'Failed to create user. Please try again.');
+      await showMessage('Error', 'Failed to create user. Please try again.');
     }
   };
 
