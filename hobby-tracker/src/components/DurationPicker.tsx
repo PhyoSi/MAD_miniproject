@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     borderColor: colors.primary,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.primaryContainer,
   },
   chipText: {
     ...fonts.body,

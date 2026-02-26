@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, ScrollView, View } from 'react-native';
 import { Button, Text } from 'react-native-paper';
 import { router, useLocalSearchParams } from 'expo-router';
 
@@ -98,7 +98,7 @@ export default function HobbyDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <OfflineBanner visible={!isOnline} />
       <HobbyDetailHeader icon={hobby.icon} name={hobby.name} />
 
@@ -126,7 +126,7 @@ export default function HobbyDetailScreen() {
       <Button mode="outlined" textColor={colors.error} onPress={handleDelete} disabled={!isOnline}>
         Delete Hobby
       </Button>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -134,7 +134,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  contentContainer: {
     padding: 20,
+    paddingBottom: 40,
   },
   notFoundTitle: {
     ...fonts.title,

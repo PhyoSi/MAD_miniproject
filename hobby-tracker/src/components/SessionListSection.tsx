@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import EmptyState from '@/src/components/EmptyState';
@@ -24,27 +24,24 @@ export default function SessionListSection({
   emptyDescription,
   isOnline,
   onDeleteSession,
-  refreshing,
-  onRefresh,
 }: SessionListSectionProps) {
   return (
     <>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <FlatList
-        contentContainerStyle={styles.list}
-        data={sessions}
-        keyExtractor={item => item.id}
-        ListEmptyComponent={<EmptyState title={emptyTitle} description={emptyDescription} />}
-        renderItem={({ item }) => (
-          <SessionCard
-            session={item}
-            onDelete={onDeleteSession ? () => onDeleteSession(item.id) : undefined}
-            disabled={!isOnline}
-          />
+      <View style={styles.list}>
+        {sessions.length === 0 ? (
+          <EmptyState title={emptyTitle} description={emptyDescription} />
+        ) : (
+          sessions.map(item => (
+            <SessionCard
+              key={item.id}
+              session={item}
+              onDelete={onDeleteSession ? () => onDeleteSession(item.id) : undefined}
+              disabled={!isOnline}
+            />
+          ))
         )}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
-      />
+      </View>
     </>
   );
 }

@@ -1,4 +1,5 @@
 export { default as AddHobbyFab } from './AddHobbyFab';
+export { default as AlertProvider } from './AlertProvider';
 export { default as DateSelector } from './DateSelector';
 export { default as DurationPicker } from './DurationPicker';
 export { default as EmptyState } from './EmptyState';
@@ -20,3 +21,4 @@ export { default as SplashBranding } from './SplashBranding';
 export { default as StatCard } from './StatCard';
 export { default as StatCardsRow } from './StatCardsRow';
 export { default as StatsSummaryRow } from './StatsSummaryRow';
+export { default as WebCalendarPicker } from './WebCalendarPicker';

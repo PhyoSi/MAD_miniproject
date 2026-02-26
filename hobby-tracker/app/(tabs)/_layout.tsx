@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@/src/constants/theme';
 
 function blurActiveElementOnWeb() {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -39,6 +40,12 @@ export default function TabLayout() {
       }}
       screenOptions={{
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+        },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
       }}>
       <Tabs.Screen
         name="home"

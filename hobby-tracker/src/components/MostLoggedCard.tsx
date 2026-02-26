@@ -30,7 +30,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    marginBottom: 16,
+    marginTop: 4,
+    marginBottom: 20,
   },
   sectionLabel: {
     ...fonts.label,

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { Button, Text, TextInput } from 'react-native-paper';
+import { Button, Text } from 'react-native-paper';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, fonts } from '@/src/constants/theme';
 import { toIsoDateString } from '@/src/utils/dateUtils';
+import WebCalendarPicker from './WebCalendarPicker';
 
 interface DateSelectorProps {
   date: Date;
@@ -37,14 +38,13 @@ export default function DateSelector({
     <View>
       <Text style={styles.label}>{label}</Text>
       {isWeb ? (
-        <TextInput
-          mode="outlined"
-          placeholder="YYYY-MM-DD"
-          value={dateInput}
-          onChangeText={onDateInputChange}
-          style={styles.input}
-          accessibilityLabel="Date input"
-          accessibilityHint="Enter date in YYYY-MM-DD format"
+        <WebCalendarPicker
+          selectedDate={date}
+          maxDate={new Date()}
+          onSelectDate={(picked) => {
+            onDateChange(picked);
+            onDateInputChange(toIsoDateString(picked));
+          }}
         />
       ) : (
         <View>
@@ -75,9 +75,5 @@ const styles = StyleSheet.create({
     ...fonts.label,
     color: colors.text,
     marginTop: 16,
-  },
-  input: {
-    marginTop: 8,
-    backgroundColor: colors.surface,
   },
 });

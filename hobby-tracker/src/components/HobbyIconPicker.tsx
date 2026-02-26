@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   },
   iconButtonActive: {
     borderColor: colors.primary,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.primaryContainer,
   },
   icon: {
     fontSize: 28,

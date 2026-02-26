@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import {
@@ -47,7 +47,7 @@ export default function StatsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <OfflineBanner visible={!isOnline} />
       <ScreenTitleBlock title="Your stats" />
 
@@ -68,7 +68,7 @@ export default function StatsScreen() {
           loadRecentSessions(30);
         }}
       />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -76,6 +76,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  content: {
     padding: 20,
+    paddingBottom: 40,
   },
 });

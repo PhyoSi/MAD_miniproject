@@ -221,6 +221,36 @@ export async function getStatsSummary(userId: string): Promise<StatsSummary> {
   const totalHours = sessions.reduce((sum, session) => sum + session.durationMinutes / 60, 0);
   const totalSessions = sessions.length;
 
+  // Average session duration
+  const avgSessionMinutes = totalSessions > 0
+    ? Math.round(sessions.reduce((sum, s) => sum + s.durationMinutes, 0) / totalSessions)
+    : 0;
+
+  // Best streak across all hobbies (global unique dates)
+  const allDates = sessions.map(s => s.date);
+  const bestStreak = calculateLongestStreak(allDates);
+
+  // This week's and previous week's hours
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayOfWeek = todayStart.getDay(); // 0 = Sun
+  const thisWeekStart = new Date(todayStart);
+  thisWeekStart.setDate(todayStart.getDate() - dayOfWeek);
+  const prevWeekStart = new Date(thisWeekStart);
+  prevWeekStart.setDate(thisWeekStart.getDate() - 7);
+
+  let thisWeekHours = 0;
+  let prevWeekHours = 0;
+  sessions.forEach(session => {
+    const d = new Date(`${session.date}T00:00:00`);
+    if (d >= thisWeekStart) {
+      thisWeekHours += session.durationMinutes / 60;
+    } else if (d >= prevWeekStart) {
+      prevWeekHours += session.durationMinutes / 60;
+    }
+  });
+
+  // Most practiced hobby
   const hoursByHobby = new Map<string, number>();
   sessions.forEach(session => {
     hoursByHobby.set(session.hobbyId, (hoursByHobby.get(session.hobbyId) ?? 0) + session.durationMinutes / 60);
@@ -244,6 +274,10 @@ export async function getStatsSummary(userId: string): Promise<StatsSummary> {
     totalHobbies: hobbies.length,
     totalHours: Number(totalHours.toFixed(2)),
     totalSessions,
+    avgSessionMinutes,
+    bestStreak,
+    thisWeekHours: Number(thisWeekHours.toFixed(1)),
+    prevWeekHours: Number(prevWeekHours.toFixed(1)),
     mostPracticedHobby: mostPracticed,
   };
 }

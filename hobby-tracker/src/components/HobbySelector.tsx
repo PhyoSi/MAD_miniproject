@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { colors, fonts } from '@/src/constants/theme';
 
@@ -25,14 +25,12 @@ export default function HobbySelector({
   return (
     <View>
       <Text style={styles.label}>{label}</Text>
-      <FlatList
-        data={hobbies}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => {
+      <View style={styles.list}>
+        {hobbies.map(item => {
           const selected = selectedHobbyId === item.id;
           return (
             <TouchableOpacity
+              key={item.id}
               style={[styles.item, selected && styles.itemSelected]}
               onPress={() => onSelectHobby(item.id)}
               accessibilityRole="radio"
@@ -42,8 +40,8 @@ export default function HobbySelector({
               <Text style={styles.name}>{item.name}</Text>
             </TouchableOpacity>
           );
-        }}
-      />
+        })}
+      </View>
     </View>
   );
 }
@@ -70,7 +68,7 @@ const styles = StyleSheet.create({
   },
   itemSelected: {
     borderColor: colors.primary,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.primaryContainer,
   },
   icon: {
     fontSize: 22,

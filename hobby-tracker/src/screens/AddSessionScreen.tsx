@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button } from 'react-native-paper';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   DateSelector,
@@ -19,6 +19,7 @@ import { toIsoDateString } from '@/src/utils/dateUtils';
 
 export default function AddSessionScreen() {
   const { hobbyId } = useLocalSearchParams<{ hobbyId?: string }>();
+  const router = useRouter();
   const { hobbies, addSession, isLoading } = useHobbyStore();
   
   // State
@@ -65,6 +66,7 @@ export default function AddSessionScreen() {
     try {
       await addSession(selectedHobbyId, isoDate, durationMinutes);
       await showMessage('Success', 'Session logged.');
+      router.replace('/(tabs)/home');
     } catch (error) {
       console.error('Error adding session:', error);
       await showMessage('Error', 'Failed to log session.');
@@ -72,7 +74,7 @@ export default function AddSessionScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <OfflineBanner visible={!isOnline} />
 
       <ScreenTitleBlock title="Log a session" />
@@ -105,7 +107,7 @@ export default function AddSessionScreen() {
         disabled={!isOnline}>
         Save Session
       </Button>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -113,7 +115,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  content: {
     padding: 20,
+    paddingBottom: 40,
   },
   saveButton: {
     marginTop: 20,

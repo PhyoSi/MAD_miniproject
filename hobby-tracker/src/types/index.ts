@@ -36,6 +36,10 @@ export interface StatsSummary {
   totalHobbies: number;
   totalHours: number;
   totalSessions: number;
+  avgSessionMinutes: number;
+  bestStreak: number;
+  thisWeekHours: number;
+  prevWeekHours: number;
   mostPracticedHobby: {
     id: string;
     name: string;

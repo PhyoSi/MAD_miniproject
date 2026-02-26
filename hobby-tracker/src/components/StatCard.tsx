@@ -11,7 +11,7 @@ interface StatCardProps {
 export default function StatCard({ label, value }: StatCardProps) {
   return (
     <Card style={styles.card} mode="outlined">
-      <Card.Content>
+      <Card.Content style={styles.content}>
         <Text style={styles.value}>{value}</Text>
         <Text style={styles.label}>{label}</Text>
       </Card.Content>
@@ -28,12 +28,16 @@ const styles = StyleSheet.create({
       web: { boxShadow: 'none' },
     }),
   },
+  content: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
   value: {
     ...fonts.heading,
     color: colors.primary,
   },
   label: {
     ...fonts.caption,
-    marginTop: 4,
+    marginTop: 6,
   },
 });

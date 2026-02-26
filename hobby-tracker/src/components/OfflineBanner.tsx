@@ -24,7 +24,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.warning,
   },
   text: {
-    color: '#1F2937',
+    color: '#111827',
     textAlign: 'center',
   },
 });

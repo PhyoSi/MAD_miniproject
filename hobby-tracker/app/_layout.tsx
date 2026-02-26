@@ -1,13 +1,14 @@
 import { useEffect } from 'react';
-import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { Platform, Pressable, StyleSheet, Text } from 'react-native';
-import { MD3LightTheme, Provider as PaperProvider } from 'react-native-paper';
+import { MD3DarkTheme, Provider as PaperProvider } from 'react-native-paper';
 
 import { colors } from '@/src/constants/theme';
 import { useHobbyStore } from '@/src/store/hobbyStore';
+import AlertProvider from '@/src/components/AlertProvider';
 import '@/src/utils/suppressWebWarnings';
 
 function WebBackButton() {
@@ -36,21 +37,38 @@ export default function RootLayout() {
     }
   }, [pathname]);
 
-  const paperTheme = {
-    ...MD3LightTheme,
+  const navigationTheme = {
+    ...DarkTheme,
     colors: {
-      ...MD3LightTheme.colors,
+      ...DarkTheme.colors,
+      background: colors.background,
+      card: colors.surface,
+      text: colors.text,
+      border: colors.border,
+      primary: colors.primary,
+    },
+  };
+
+  const paperTheme = {
+    ...MD3DarkTheme,
+    colors: {
+      ...MD3DarkTheme.colors,
       primary: colors.primary,
       background: colors.background,
       surface: colors.surface,
+      surfaceVariant: colors.surface,
+      onSurface: colors.text,
+      onSurfaceVariant: colors.textSecondary,
+      outline: colors.border,
       error: colors.error,
     },
   };
 
   return (
     <PaperProvider theme={paperTheme}>
-      <ThemeProvider value={DefaultTheme}>
-        <Stack>
+      <AlertProvider>
+        <ThemeProvider value={navigationTheme}>
+          <Stack>
           <Stack.Screen name="splash" options={{ headerShown: false }} />
           <Stack.Screen name="welcome" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -59,19 +77,20 @@ export default function RootLayout() {
             options={{
               presentation: 'modal',
               title: 'Add Hobby',
-              headerLeft: () => <WebBackButton />,
+              ...(Platform.OS === 'web' && { headerLeft: () => <WebBackButton /> }),
             }}
           />
           <Stack.Screen
             name="hobby/[id]"
             options={{
               title: 'Hobby Details',
-              headerLeft: () => <WebBackButton />,
+              ...(Platform.OS === 'web' && { headerLeft: () => <WebBackButton /> }),
             }}
           />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+          </Stack>
+          <StatusBar style="light" />
+        </ThemeProvider>
+      </AlertProvider>
     </PaperProvider>
   );
 }
