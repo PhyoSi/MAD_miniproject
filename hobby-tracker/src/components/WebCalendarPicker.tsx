@@ -8,6 +8,18 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+const FIRST_MONTH_INDEX = 0;
+const LAST_MONTH_INDEX = 11;
+const FIRST_DAY_OF_MONTH = 1;
+const LAST_DAY_OF_MONTH = 0;
+const DAY_CELL_WIDTH = '14.28%';
+const DAY_BUTTON_SIZE = 36;
+
+function getNextMonthYear(currentMonth: number, currentYear: number) {
+  const nextMonth = currentMonth === LAST_MONTH_INDEX ? FIRST_MONTH_INDEX : currentMonth + 1;
+  const nextYear = currentMonth === LAST_MONTH_INDEX ? currentYear + 1 : currentYear;
+  return { nextMonth, nextYear };
+}
 
 interface WebCalendarPickerProps {
   selectedDate: Date;
@@ -31,8 +43,8 @@ export default function WebCalendarPicker({
   const effectiveMax = maxDate ?? today;
 
   const calendarDays = useMemo(() => {
-    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
-    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const firstDay = new Date(viewYear, viewMonth, FIRST_DAY_OF_MONTH).getDay();
+    const daysInMonth = new Date(viewYear, viewMonth + 1, LAST_DAY_OF_MONTH).getDate();
 
     const cells: (number | null)[] = [];
     for (let i = 0; i < firstDay; i++) {
@@ -47,8 +59,8 @@ export default function WebCalendarPicker({
   const selectedIso = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
   const handlePrevMonth = () => {
-    if (viewMonth === 0) {
-      setViewMonth(11);
+    if (viewMonth === FIRST_MONTH_INDEX) {
+      setViewMonth(LAST_MONTH_INDEX);
       setViewYear(viewYear - 1);
     } else {
       setViewMonth(viewMonth - 1);
@@ -56,18 +68,16 @@ export default function WebCalendarPicker({
   };
 
   const handleNextMonth = () => {
-    const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1;
-    const nextYear = viewMonth === 11 ? viewYear + 1 : viewYear;
-    const firstOfNext = new Date(nextYear, nextMonth, 1);
+    const { nextMonth, nextYear } = getNextMonthYear(viewMonth, viewYear);
+    const firstOfNext = new Date(nextYear, nextMonth, FIRST_DAY_OF_MONTH);
     if (firstOfNext > effectiveMax) return;
     setViewMonth(nextMonth);
     setViewYear(nextYear);
   };
 
   const canGoNext = (() => {
-    const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1;
-    const nextYear = viewMonth === 11 ? viewYear + 1 : viewYear;
-    return new Date(nextYear, nextMonth, 1) <= effectiveMax;
+    const { nextMonth, nextYear } = getNextMonthYear(viewMonth, viewYear);
+    return new Date(nextYear, nextMonth, FIRST_DAY_OF_MONTH) <= effectiveMax;
   })();
 
   const handleDayPress = (day: number) => {
@@ -194,7 +204,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   dayCell: {
-    width: '14.28%',
+    width: DAY_CELL_WIDTH,
     alignItems: 'center',
     paddingVertical: 2,
   },
@@ -204,9 +214,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dayButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: DAY_BUTTON_SIZE,
+    height: DAY_BUTTON_SIZE,
+    borderRadius: DAY_BUTTON_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

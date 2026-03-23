@@ -17,6 +17,15 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 
+import {
+  ALL_TIME_LOOKBACK_DAYS,
+  DEFAULT_RECENT_DAYS,
+  MAX_RECENT_SESSIONS_QUERY,
+  MINUTES_PER_HOUR,
+  ONE_DECIMAL_PLACES,
+  TWO_DECIMAL_PLACES,
+  WEEK_DAYS,
+} from '@/src/constants/app';
 import { db } from '@/src/config/firebase';
 import type { Hobby, HobbyStats, Session, SessionWithHobby, StatsSummary, User } from '@/src/types';
 import { calculateLongestStreak, calculateStreak } from '@/src/utils/dateUtils';
@@ -38,34 +47,120 @@ function toIsoString(value: unknown): string {
   return new Date().toISOString();
 }
 
-function mapUser(id: string, data: Record<string, unknown>): User {
+function roundTo(value: number, decimalPlaces: number): number {
+  return Number(value.toFixed(decimalPlaces));
+}
+
+function sumSessionHours(sessions: Session[]): number {
+  return sessions.reduce((sum, session) => sum + session.durationMinutes / MINUTES_PER_HOUR, 0);
+}
+
+function mapSessionsWithHobby(
+  sessions: Session[],
+  hobbyById: Map<string, Hobby>
+): SessionWithHobby[] {
+  return sessions.map(session => {
+    const hobby = hobbyById.get(session.hobbyId);
+    return {
+      ...session,
+      hobbyName: hobby?.name ?? 'Unknown',
+      hobbyIcon: hobby?.icon ?? '🎯',
+    };
+  });
+}
+
+function calculateAverageSessionMinutes(sessions: Session[]): number {
+  if (sessions.length === 0) return 0;
+  const totalMinutes = sessions.reduce((sum, session) => sum + session.durationMinutes, 0);
+  return Math.round(totalMinutes / sessions.length);
+}
+
+function calculateWeekHours(sessions: Session[]): Pick<StatsSummary, 'thisWeekHours' | 'prevWeekHours'> {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayOfWeek = todayStart.getDay();
+  const thisWeekStart = new Date(todayStart);
+  thisWeekStart.setDate(todayStart.getDate() - dayOfWeek);
+
+  const prevWeekStart = new Date(thisWeekStart);
+  prevWeekStart.setDate(thisWeekStart.getDate() - WEEK_DAYS);
+
+  let thisWeekHours = 0;
+  let prevWeekHours = 0;
+
+  sessions.forEach(session => {
+    const sessionDate = new Date(`${session.date}T00:00:00`);
+    if (sessionDate >= thisWeekStart) {
+      thisWeekHours += session.durationMinutes / MINUTES_PER_HOUR;
+      return;
+    }
+    if (sessionDate >= prevWeekStart) {
+      prevWeekHours += session.durationMinutes / MINUTES_PER_HOUR;
+    }
+  });
+
+  return {
+    thisWeekHours: roundTo(thisWeekHours, ONE_DECIMAL_PLACES),
+    prevWeekHours: roundTo(prevWeekHours, ONE_DECIMAL_PLACES),
+  };
+}
+
+function calculateMostPracticedHobby(
+  hobbies: Hobby[],
+  sessions: Session[]
+): StatsSummary['mostPracticedHobby'] {
+  const hoursByHobbyId = new Map<string, number>();
+
+  sessions.forEach(session => {
+    const currentHours = hoursByHobbyId.get(session.hobbyId) ?? 0;
+    hoursByHobbyId.set(session.hobbyId, currentHours + session.durationMinutes / MINUTES_PER_HOUR);
+  });
+
+  let mostPracticed: StatsSummary['mostPracticedHobby'] = null;
+  hoursByHobbyId.forEach((hours, hobbyId) => {
+    const hobby = hobbies.find(item => item.id === hobbyId);
+    if (!hobby) return;
+    if (!mostPracticed || hours > mostPracticed.hours) {
+      mostPracticed = {
+        id: hobby.id,
+        name: hobby.name,
+        icon: hobby.icon,
+        hours: roundTo(hours, TWO_DECIMAL_PLACES),
+      };
+    }
+  });
+
+  return mostPracticed;
+}
+
+function mapUser(id: string, userDoc: Record<string, unknown>): User {
   return {
     user_id: id,
-    name: (data.name as string) ?? '',
-    created_at: toIsoString(data.created_at),
-    hobbies: (data.hobbies as string[]) ?? [],
+    name: (userDoc.name as string) ?? '',
+    created_at: toIsoString(userDoc.created_at),
+    hobbies: (userDoc.hobbies as string[]) ?? [],
   };
 }
 
-function mapHobby(id: string, data: Record<string, unknown>): Hobby {
+function mapHobby(id: string, hobbyDoc: Record<string, unknown>): Hobby {
   return {
     id,
-    userId: (data.userId as string) ?? '',
-    name: (data.name as string) ?? '',
-    icon: (data.icon as string) ?? '🎯',
-    createdAt: toIsoString(data.createdAt),
-    updatedAt: toIsoString(data.updatedAt),
+    userId: (hobbyDoc.userId as string) ?? '',
+    name: (hobbyDoc.name as string) ?? '',
+    icon: (hobbyDoc.icon as string) ?? '🎯',
+    createdAt: toIsoString(hobbyDoc.createdAt),
+    updatedAt: toIsoString(hobbyDoc.updatedAt),
   };
 }
 
-function mapSession(id: string, data: Record<string, unknown>): Session {
+function mapSession(id: string, sessionDoc: Record<string, unknown>): Session {
   return {
     id,
-    userId: (data.userId as string) ?? '',
-    hobbyId: (data.hobbyId as string) ?? '',
-    date: (data.date as string) ?? '',
-    durationMinutes: (data.durationMinutes as number) ?? 0,
-    createdAt: toIsoString(data.createdAt),
+    userId: (sessionDoc.userId as string) ?? '',
+    hobbyId: (sessionDoc.hobbyId as string) ?? '',
+    date: (sessionDoc.date as string) ?? '',
+    durationMinutes: (sessionDoc.durationMinutes as number) ?? 0,
+    createdAt: toIsoString(sessionDoc.createdAt),
   };
 }
 
@@ -87,14 +182,14 @@ export async function getUserProfile(userId: string): Promise<User> {
     throw new Error('User not found');
   }
 
-  const data = userSnapshot.data();
-  if ('location' in data) {
+  const userDoc = userSnapshot.data();
+  if ('location' in userDoc) {
     await updateDoc(userRef, {
       location: deleteField(),
     });
   }
 
-  return mapUser(userSnapshot.id, data);
+  return mapUser(userSnapshot.id, userDoc);
 }
 
 export async function getUserHobbies(userId: string): Promise<Hobby[]> {
@@ -160,32 +255,29 @@ export async function createSession(
   return mapSession(sessionSnapshot.id, sessionSnapshot.data() ?? {});
 }
 
-export async function getRecentSessions(userId: string, days = 30): Promise<SessionWithHobby[]> {
+export async function getRecentSessions(
+  userId: string,
+  days = DEFAULT_RECENT_DAYS
+): Promise<SessionWithHobby[]> {
   const hobbies = await getUserHobbies(userId);
-  const hobbyMap = new Map(hobbies.map(hobby => [hobby.id, hobby]));
+  const hobbyById = new Map(hobbies.map(hobby => [hobby.id, hobby]));
 
   const sessionsQuery = query(
     sessionsCollection,
     where('userId', '==', userId),
     orderBy('date', 'desc'),
-    limit(200)
+    limit(MAX_RECENT_SESSIONS_QUERY)
   );
 
   const snapshot = await getDocs(sessionsQuery);
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
 
-  return snapshot.docs
+  const filteredSessions = snapshot.docs
     .map(docSnap => mapSession(docSnap.id, docSnap.data()))
-    .filter(session => new Date(session.date) >= cutoff)
-    .map(session => {
-      const hobby = hobbyMap.get(session.hobbyId);
-      return {
-        ...session,
-        hobbyName: hobby?.name ?? 'Unknown',
-        hobbyIcon: hobby?.icon ?? '🎯',
-      };
-    });
+    .filter(session => new Date(session.date) >= cutoff);
+
+  return mapSessionsWithHobby(filteredSessions, hobbyById);
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
@@ -203,11 +295,11 @@ export async function getHobbyStats(hobbyId: string, userId: string): Promise<Ho
 
   const sessions = snapshot.docs.map(docSnap => mapSession(docSnap.id, docSnap.data()));
   const totalSessions = sessions.length;
-  const totalHours = sessions.reduce((sum, session) => sum + session.durationMinutes / 60, 0);
+  const totalHours = sumSessionHours(sessions);
   const dates = sessions.map(session => session.date);
 
   return {
-    totalHours: Number(totalHours.toFixed(2)),
+    totalHours: roundTo(totalHours, TWO_DECIMAL_PLACES),
     totalSessions,
     currentStreak: calculateStreak(dates),
     longestStreak: calculateLongestStreak(dates),
@@ -216,68 +308,22 @@ export async function getHobbyStats(hobbyId: string, userId: string): Promise<Ho
 
 export async function getStatsSummary(userId: string): Promise<StatsSummary> {
   const hobbies = await getUserHobbies(userId);
-  const sessions = await getRecentSessions(userId, 3650);
-
-  const totalHours = sessions.reduce((sum, session) => sum + session.durationMinutes / 60, 0);
+  const sessions = await getRecentSessions(userId, ALL_TIME_LOOKBACK_DAYS);
+  const totalHours = sumSessionHours(sessions);
   const totalSessions = sessions.length;
-
-  // Average session duration
-  const avgSessionMinutes = totalSessions > 0
-    ? Math.round(sessions.reduce((sum, s) => sum + s.durationMinutes, 0) / totalSessions)
-    : 0;
-
-  // Best streak across all hobbies (global unique dates)
-  const allDates = sessions.map(s => s.date);
-  const bestStreak = calculateLongestStreak(allDates);
-
-  // This week's and previous week's hours
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayOfWeek = todayStart.getDay(); // 0 = Sun
-  const thisWeekStart = new Date(todayStart);
-  thisWeekStart.setDate(todayStart.getDate() - dayOfWeek);
-  const prevWeekStart = new Date(thisWeekStart);
-  prevWeekStart.setDate(thisWeekStart.getDate() - 7);
-
-  let thisWeekHours = 0;
-  let prevWeekHours = 0;
-  sessions.forEach(session => {
-    const d = new Date(`${session.date}T00:00:00`);
-    if (d >= thisWeekStart) {
-      thisWeekHours += session.durationMinutes / 60;
-    } else if (d >= prevWeekStart) {
-      prevWeekHours += session.durationMinutes / 60;
-    }
-  });
-
-  // Most practiced hobby
-  const hoursByHobby = new Map<string, number>();
-  sessions.forEach(session => {
-    hoursByHobby.set(session.hobbyId, (hoursByHobby.get(session.hobbyId) ?? 0) + session.durationMinutes / 60);
-  });
-
-  let mostPracticed: StatsSummary['mostPracticedHobby'] = null;
-  hoursByHobby.forEach((hours, hobbyId) => {
-    const hobby = hobbies.find(item => item.id === hobbyId);
-    if (!hobby) return;
-    if (!mostPracticed || hours > mostPracticed.hours) {
-      mostPracticed = {
-        id: hobby.id,
-        name: hobby.name,
-        icon: hobby.icon,
-        hours: Number(hours.toFixed(2)),
-      };
-    }
-  });
+  const avgSessionMinutes = calculateAverageSessionMinutes(sessions);
+  const bestStreak = calculateLongestStreak(sessions.map(session => session.date));
+  const { thisWeekHours, prevWeekHours } = calculateWeekHours(sessions);
+  const mostPracticedHobby = calculateMostPracticedHobby(hobbies, sessions);
 
   return {
     totalHobbies: hobbies.length,
-    totalHours: Number(totalHours.toFixed(2)),
+    totalHours: roundTo(totalHours, TWO_DECIMAL_PLACES),
     totalSessions,
     avgSessionMinutes,
     bestStreak,
-    thisWeekHours: Number(thisWeekHours.toFixed(1)),
-    prevWeekHours: Number(prevWeekHours.toFixed(1)),
-    mostPracticedHobby: mostPracticed,
+    thisWeekHours,
+    prevWeekHours,
+    mostPracticedHobby,
   };
 }

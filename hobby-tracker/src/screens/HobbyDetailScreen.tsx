@@ -10,12 +10,14 @@ import {
   OfflineBanner,
   SessionListSection,
 } from '@/src/components';
+import { ALL_TIME_LOOKBACK_DAYS, MAX_HOBBY_RECENT_SESSIONS } from '@/src/constants/app';
 import { colors, fonts } from '@/src/constants/theme';
 import { useOnlineStatus } from '@/src/hooks/use-online-status';
 import { useHobbyStore } from '@/src/store/hobbyStore';
 import * as HobbyAPI from '@/src/services/hobbyApi';
 import type { HobbyStats, SessionWithHobby } from '@/src/types';
 import { showConfirmation, showMessage } from '@/src/utils/appAlerts';
+import { confirmAndDeleteSession } from '@/src/utils/sessionActions';
 
 export default function HobbyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -33,10 +35,14 @@ export default function HobbyDetailScreen() {
     try {
       const [statsResponse, recentSessions] = await Promise.all([
         HobbyAPI.getHobbyStats(id, userId),
-        HobbyAPI.getRecentSessions(userId, 3650),
+        HobbyAPI.getRecentSessions(userId, ALL_TIME_LOOKBACK_DAYS),
       ]);
       setStats(statsResponse);
-      setSessions(recentSessions.filter(session => session.hobbyId === id).slice(0, 10));
+      setSessions(
+        recentSessions
+          .filter(session => session.hobbyId === id)
+          .slice(0, MAX_HOBBY_RECENT_SESSIONS)
+      );
     } catch (error) {
       console.error('Error loading hobby detail:', error);
     } finally {
@@ -70,23 +76,12 @@ export default function HobbyDetailScreen() {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    const confirmed = await showConfirmation(
-      'Delete session',
-      'Are you sure you want to delete this session?'
-    );
-    if (!confirmed) return;
-
-    try {
-      if (!isOnline) {
-        await showMessage('Offline', 'Connect to the internet to delete sessions.');
-        return;
-      }
-      await deleteSession(sessionId);
-      await hydrate();
-    } catch (error) {
-      console.error('Error deleting session:', error);
-      await showMessage('Error', 'Failed to delete session.');
-    }
+    await confirmAndDeleteSession({
+      isOnline,
+      deleteSession,
+      sessionId,
+      onSuccess: hydrate,
+    });
   };
 
   if (!hobby) {

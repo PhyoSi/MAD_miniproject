@@ -1,3 +1,5 @@
+import { Alert, Platform } from 'react-native';
+
 import { getAlertAPI } from '@/src/components/AlertProvider';
 
 export async function showMessage(title: string, message: string): Promise<void> {
@@ -14,7 +16,6 @@ export async function showMessage(title: string, message: string): Promise<void>
   }
 
   // Fallback before provider mounts
-  const { Alert, Platform } = require('react-native');
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.alert(`${title}\n\n${message}`);
   } else {
@@ -35,7 +36,6 @@ export async function showConfirmation(title: string, message: string): Promise<
   }
 
   // Fallback before provider mounts
-  const { Alert, Platform } = require('react-native');
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     return window.confirm(`${title}\n\n${message}`);
   }

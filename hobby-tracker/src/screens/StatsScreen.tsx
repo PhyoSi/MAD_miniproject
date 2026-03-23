@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import {
@@ -9,10 +9,11 @@ import {
   SessionListSection,
   StatsSummaryRow,
 } from '@/src/components';
+import { DEFAULT_RECENT_DAYS } from '@/src/constants/app';
 import { colors } from '@/src/constants/theme';
 import { useOnlineStatus } from '@/src/hooks/use-online-status';
 import { useHobbyStore } from '@/src/store/hobbyStore';
-import { showConfirmation, showMessage } from '@/src/utils/appAlerts';
+import { confirmAndDeleteSession } from '@/src/utils/sessionActions';
 
 export default function StatsScreen() {
   const { userId, stats, sessions, loadStats, loadRecentSessions, deleteSession, isLoading } = useHobbyStore();
@@ -22,28 +23,19 @@ export default function StatsScreen() {
     useCallback(() => {
       if (!userId) return;
       loadStats();
-      loadRecentSessions(30);
+      loadRecentSessions(DEFAULT_RECENT_DAYS);
     }, [loadStats, loadRecentSessions, userId])
   );
 
   const handleDeleteSession = async (sessionId: string) => {
-    const confirmed = await showConfirmation(
-      'Delete session',
-      'Are you sure you want to delete this session?'
-    );
-    if (!confirmed) return;
-
-    try {
-      if (!isOnline) {
-        await showMessage('Offline', 'Connect to the internet to delete sessions.');
-        return;
-      }
-      await deleteSession(sessionId);
-      await Promise.all([loadStats(), loadRecentSessions(30)]);
-    } catch (error) {
-      console.error('Error deleting session:', error);
-      await showMessage('Error', 'Failed to delete session.');
-    }
+    await confirmAndDeleteSession({
+      isOnline,
+      deleteSession,
+      sessionId,
+      onSuccess: async () => {
+        await Promise.all([loadStats(), loadRecentSessions(DEFAULT_RECENT_DAYS)]);
+      },
+    });
   };
 
   return (
@@ -65,7 +57,7 @@ export default function StatsScreen() {
         refreshing={isLoading}
         onRefresh={() => {
           loadStats();
-          loadRecentSessions(30);
+          loadRecentSessions(DEFAULT_RECENT_DAYS);
         }}
       />
     </ScrollView>

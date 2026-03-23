@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 

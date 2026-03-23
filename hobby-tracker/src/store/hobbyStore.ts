@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 
+import { DEFAULT_RECENT_DAYS } from '@/src/constants/app';
 import * as HobbyAPI from '@/src/services/hobbyApi';
 import type { Hobby, SessionWithHobby, StatsSummary, User } from '@/src/types';
 
@@ -30,128 +31,156 @@ interface HobbyStore {
   loadStats: () => Promise<void>;
 }
 
-export const useHobbyStore = create<HobbyStore>((set, get) => ({
-  user: null,
-  userId: null,
-  hobbies: [],
-  sessions: [],
-  stats: null,
-  isLoading: false,
-  error: null,
-
-  setUser: (user: User) => set({ user, userId: user.user_id }),
-
-  loadUserId: async () => {
-    const storedId = await AsyncStorage.getItem(USER_ID_KEY);
-    set({ userId: storedId });
-    return storedId;
-  },
-
-  createUser: async (name: string) => {
+export const useHobbyStore = create<HobbyStore>((set, get) => {
+  const runStoreAction = async <T>(
+    contextLabel: string,
+    errorMessage: string,
+    action: () => Promise<T>,
+    shouldRethrow = false
+  ): Promise<T | undefined> => {
     try {
       set({ isLoading: true, error: null });
-      const user = await HobbyAPI.createUser(name);
-      await AsyncStorage.setItem(USER_ID_KEY, user.user_id);
-      set({ user, userId: user.user_id, isLoading: false });
-      return user;
-    } catch (error) {
-      console.error('Error creating user:', error);
-      set({ error: 'Failed to create user.', isLoading: false });
-      throw error;
-    }
-  },
-
-  loadHobbies: async () => {
-    const userId = get().userId;
-    if (!userId) return;
-    try {
-      set({ isLoading: true, error: null });
-      const hobbies = await HobbyAPI.getUserHobbies(userId);
-      set({ hobbies, isLoading: false });
-    } catch (error) {
-      console.error('Error loading hobbies:', error);
-      set({ error: 'Failed to load hobbies.', isLoading: false });
-    }
-  },
-
-  addHobby: async (name: string, icon: string) => {
-    const userId = get().userId;
-    if (!userId) throw new Error('Missing user');
-    try {
-      set({ isLoading: true, error: null });
-      const hobby = await HobbyAPI.createHobby(userId, name, icon);
-      set(state => ({ hobbies: [hobby, ...state.hobbies], isLoading: false }));
-      return hobby;
-    } catch (error) {
-      console.error('Error adding hobby:', error);
-      set({ error: 'Failed to add hobby.', isLoading: false });
-      throw error;
-    }
-  },
-
-  deleteHobby: async (hobbyId: string) => {
-    const userId = get().userId;
-    if (!userId) return;
-    try {
-      set({ isLoading: true, error: null });
-      await HobbyAPI.deleteHobby(hobbyId, userId);
-      set(state => ({ hobbies: state.hobbies.filter(hobby => hobby.id !== hobbyId), isLoading: false }));
-    } catch (error) {
-      console.error('Error deleting hobby:', error);
-      set({ error: 'Failed to delete hobby.', isLoading: false });
-      throw error;
-    }
-  },
-
-  loadRecentSessions: async (days = 30) => {
-    const userId = get().userId;
-    if (!userId) return;
-    try {
-      set({ isLoading: true, error: null });
-      const sessions = await HobbyAPI.getRecentSessions(userId, days);
-      set({ sessions, isLoading: false });
-    } catch (error) {
-      console.error('Error loading sessions:', error);
-      set({ error: 'Failed to load sessions.', isLoading: false });
-    }
-  },
-
-  addSession: async (hobbyId: string, date: string, durationMinutes: number) => {
-    const userId = get().userId;
-    if (!userId) throw new Error('Missing user');
-    try {
-      set({ isLoading: true, error: null });
-      await HobbyAPI.createSession(userId, hobbyId, date, durationMinutes);
+      const result = await action();
       set({ isLoading: false });
+      return result;
     } catch (error) {
-      console.error('Error adding session:', error);
-      set({ error: 'Failed to add session.', isLoading: false });
-      throw error;
+      console.error(`${contextLabel}:`, error);
+      set({ error: errorMessage, isLoading: false });
+      if (shouldRethrow) {
+        throw error;
+      }
+      return undefined;
     }
-  },
+  };
 
-  deleteSession: async (sessionId: string) => {
-    try {
-      set({ isLoading: true, error: null });
-      await HobbyAPI.deleteSession(sessionId);
-      set(state => ({ sessions: state.sessions.filter(session => session.id !== sessionId), isLoading: false }));
-    } catch (error) {
-      console.error('Error deleting session:', error);
-      set({ error: 'Failed to delete session.', isLoading: false });
-      throw error;
-    }
-  },
+  return {
+    user: null,
+    userId: null,
+    hobbies: [],
+    sessions: [],
+    stats: null,
+    isLoading: false,
+    error: null,
 
-  loadStats: async () => {
-    const userId = get().userId;
-    if (!userId) return;
-    try {
-      set({ isLoading: true, error: null });
-      const stats = await HobbyAPI.getStatsSummary(userId);
-      set({ stats, isLoading: false });
-    } catch (error) {
-      console.error('Error loading stats:', error);
-      set({ error: 'Failed to load stats.', isLoading: false });
-    }
-  },
-}));
+    setUser: (user: User) => set({ user, userId: user.user_id }),
+
+    loadUserId: async () => {
+      const storedId = await AsyncStorage.getItem(USER_ID_KEY);
+      set({ userId: storedId });
+      return storedId;
+    },
+
+    createUser: async (name: string) => {
+      const createdUser = await runStoreAction(
+        'Error creating user',
+        'Failed to create user.',
+        async () => {
+          const nextUser = await HobbyAPI.createUser(name);
+          await AsyncStorage.setItem(USER_ID_KEY, nextUser.user_id);
+          set({ user: nextUser, userId: nextUser.user_id });
+          return nextUser;
+        },
+        true
+      );
+
+      if (!createdUser) {
+        throw new Error('Failed to create user.');
+      }
+
+      return createdUser;
+    },
+
+    loadHobbies: async () => {
+      const userId = get().userId;
+      if (!userId) return;
+
+      await runStoreAction('Error loading hobbies', 'Failed to load hobbies.', async () => {
+        const hobbies = await HobbyAPI.getUserHobbies(userId);
+        set({ hobbies });
+      });
+    },
+
+    addHobby: async (name: string, icon: string) => {
+      const userId = get().userId;
+      if (!userId) throw new Error('Missing user');
+
+      const createdHobby = await runStoreAction(
+        'Error adding hobby',
+        'Failed to add hobby.',
+        async () => {
+          const nextHobby = await HobbyAPI.createHobby(userId, name, icon);
+          set(state => ({ hobbies: [nextHobby, ...state.hobbies] }));
+          return nextHobby;
+        },
+        true
+      );
+
+      if (!createdHobby) {
+        throw new Error('Failed to add hobby.');
+      }
+
+      return createdHobby;
+    },
+
+    deleteHobby: async (hobbyId: string) => {
+      const userId = get().userId;
+      if (!userId) return;
+
+      await runStoreAction(
+        'Error deleting hobby',
+        'Failed to delete hobby.',
+        async () => {
+          await HobbyAPI.deleteHobby(hobbyId, userId);
+          set(state => ({ hobbies: state.hobbies.filter(hobby => hobby.id !== hobbyId) }));
+        },
+        true
+      );
+    },
+
+    loadRecentSessions: async (days = DEFAULT_RECENT_DAYS) => {
+      const userId = get().userId;
+      if (!userId) return;
+
+      await runStoreAction('Error loading sessions', 'Failed to load sessions.', async () => {
+        const sessions = await HobbyAPI.getRecentSessions(userId, days);
+        set({ sessions });
+      });
+    },
+
+    addSession: async (hobbyId: string, date: string, durationMinutes: number) => {
+      const userId = get().userId;
+      if (!userId) throw new Error('Missing user');
+
+      await runStoreAction(
+        'Error adding session',
+        'Failed to add session.',
+        async () => {
+          await HobbyAPI.createSession(userId, hobbyId, date, durationMinutes);
+        },
+        true
+      );
+    },
+
+    deleteSession: async (sessionId: string) => {
+      await runStoreAction(
+        'Error deleting session',
+        'Failed to delete session.',
+        async () => {
+          await HobbyAPI.deleteSession(sessionId);
+          set(state => ({ sessions: state.sessions.filter(session => session.id !== sessionId) }));
+        },
+        true
+      );
+    },
+
+    loadStats: async () => {
+      const userId = get().userId;
+      if (!userId) return;
+
+      await runStoreAction('Error loading stats', 'Failed to load stats.', async () => {
+        const stats = await HobbyAPI.getStatsSummary(userId);
+        set({ stats });
+      });
+    },
+  };
+});
