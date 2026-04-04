@@ -12,6 +12,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -27,12 +28,102 @@ import {
   WEEK_DAYS,
 } from '@/src/constants/app';
 import { db } from '@/src/config/firebase';
+import { waitForAuth } from '@/src/services/auth';
 import type { Hobby, HobbyStats, Session, SessionWithHobby, StatsSummary, User } from '@/src/types';
 import { calculateLongestStreak, calculateStreak } from '@/src/utils/dateUtils';
 
 const usersCollection = collection(db, 'users');
 const hobbiesCollection = collection(db, 'hobbies');
 const sessionsCollection = collection(db, 'sessions');
+
+async function getAuthenticatedUserId(): Promise<string> {
+  const user = await waitForAuth();
+  return user.uid;
+}
+
+async function resolveTargetUserId(): Promise<string> {
+  return getAuthenticatedUserId();
+}
+
+async function migrateLegacyUserData(legacyUserId: string, authenticatedUserId: string): Promise<void> {
+  if (!legacyUserId || legacyUserId === authenticatedUserId) {
+    return;
+  }
+
+  const legacyUserRef = doc(usersCollection, legacyUserId);
+  const authenticatedUserRef = doc(usersCollection, authenticatedUserId);
+
+  let legacyUserSnapshot;
+  let authenticatedUserSnapshot;
+
+  try {
+    [legacyUserSnapshot, authenticatedUserSnapshot] = await Promise.all([
+      getDoc(legacyUserRef),
+      getDoc(authenticatedUserRef),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.toLowerCase().includes('insufficient permissions')) {
+      return;
+    }
+    throw error;
+  }
+
+  if (!legacyUserSnapshot.exists()) {
+    return;
+  }
+
+  const legacyUserDoc = legacyUserSnapshot.data();
+  const authenticatedUserDoc = authenticatedUserSnapshot.exists()
+    ? authenticatedUserSnapshot.data()
+    : null;
+
+  const legacyHobbiesSnapshot = await getDocs(
+    query(hobbiesCollection, where('userId', '==', legacyUserId))
+  );
+  const legacySessionsSnapshot = await getDocs(
+    query(sessionsCollection, where('userId', '==', legacyUserId))
+  );
+
+  for (const hobbySnapshot of legacyHobbiesSnapshot.docs) {
+    await updateDoc(hobbySnapshot.ref, {
+      userId: authenticatedUserId,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  for (const sessionSnapshot of legacySessionsSnapshot.docs) {
+    await updateDoc(sessionSnapshot.ref, {
+      userId: authenticatedUserId,
+    });
+  }
+
+  const legacyHobbyIds = legacyHobbiesSnapshot.docs.map(snapshot => snapshot.id);
+  const existingAuthHobbyIds = Array.isArray(authenticatedUserDoc?.hobbies)
+    ? (authenticatedUserDoc?.hobbies as string[])
+    : [];
+  const legacyUserHobbyIds = Array.isArray(legacyUserDoc.hobbies)
+    ? (legacyUserDoc.hobbies as string[])
+    : [];
+
+  const mergedHobbyIds = Array.from(new Set([...existingAuthHobbyIds, ...legacyUserHobbyIds, ...legacyHobbyIds]));
+  const authName = typeof authenticatedUserDoc?.name === 'string' ? authenticatedUserDoc.name : '';
+  const legacyName = typeof legacyUserDoc.name === 'string' ? legacyUserDoc.name : '';
+
+  await setDoc(
+    authenticatedUserRef,
+    {
+      name: authName || legacyName,
+      created_at: authenticatedUserDoc?.created_at ?? legacyUserDoc.created_at ?? serverTimestamp(),
+      hobbies: mergedHobbyIds,
+      migratedFrom: legacyUserId,
+      migratedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  await deleteDoc(legacyUserRef);
+}
 
 function toIsoString(value: unknown): string {
   if (value instanceof Date) {
@@ -165,26 +256,56 @@ function mapSession(id: string, sessionDoc: Record<string, unknown>): Session {
 }
 
 export async function createUser(name: string): Promise<User> {
-  const userRef = await addDoc(usersCollection, {
+  const authenticatedUserId = await getAuthenticatedUserId();
+  const userRef = doc(usersCollection, authenticatedUserId);
+
+  await setDoc(userRef, {
     name,
     created_at: serverTimestamp(),
     hobbies: [],
-  });
+  }, { merge: true });
 
   const userSnapshot = await getDoc(userRef);
   return mapUser(userSnapshot.id, userSnapshot.data() ?? {});
 }
 
 export async function getUserProfile(userId: string): Promise<User> {
-  const userRef = doc(usersCollection, userId);
-  const userSnapshot = await getDoc(userRef);
+  const authenticatedUserId = await getAuthenticatedUserId();
+
+  if (userId && userId.trim().length > 0 && userId !== authenticatedUserId) {
+    try {
+      await migrateLegacyUserData(userId, authenticatedUserId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.toLowerCase().includes('insufficient permissions')) {
+        throw error;
+      }
+    }
+  }
+
+  const authUserRef = doc(usersCollection, authenticatedUserId);
+  let userSnapshot = await getDoc(authUserRef);
   if (!userSnapshot.exists()) {
-    throw new Error('User not found');
+    await setDoc(
+      authUserRef,
+      {
+        name: '',
+        created_at: serverTimestamp(),
+        hobbies: [],
+      },
+      { merge: true }
+    );
+
+    userSnapshot = await getDoc(authUserRef);
+  }
+
+  if (!userSnapshot.exists()) {
+    throw new Error('Failed to initialize user profile');
   }
 
   const userDoc = userSnapshot.data();
   if ('location' in userDoc) {
-    await updateDoc(userRef, {
+    await updateDoc(authUserRef, {
       location: deleteField(),
     });
   }
@@ -192,23 +313,27 @@ export async function getUserProfile(userId: string): Promise<User> {
   return mapUser(userSnapshot.id, userDoc);
 }
 
-export async function getUserHobbies(userId: string): Promise<Hobby[]> {
-  const hobbiesQuery = query(hobbiesCollection, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+export async function getUserHobbies(_userId: string): Promise<Hobby[]> {
+  const targetUserId = await resolveTargetUserId();
+
+  const hobbiesQuery = query(hobbiesCollection, where('userId', '==', targetUserId), orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(hobbiesQuery);
   return snapshot.docs.map(docSnap => mapHobby(docSnap.id, docSnap.data()));
 }
 
-export async function createHobby(userId: string, name: string, icon: string): Promise<Hobby> {
+export async function createHobby(_userId: string, name: string, icon: string): Promise<Hobby> {
+  const ownerUserId = await resolveTargetUserId();
+
   const now = serverTimestamp();
   const hobbyRef = await addDoc(hobbiesCollection, {
-    userId,
+    userId: ownerUserId,
     name,
     icon,
     createdAt: now,
     updatedAt: now,
   });
 
-  await updateDoc(doc(usersCollection, userId), {
+  await updateDoc(doc(usersCollection, ownerUserId), {
     hobbies: arrayUnion(hobbyRef.id),
   });
 
@@ -216,11 +341,13 @@ export async function createHobby(userId: string, name: string, icon: string): P
   return mapHobby(hobbySnapshot.id, hobbySnapshot.data() ?? {});
 }
 
-export async function deleteHobby(hobbyId: string, userId: string): Promise<void> {
+export async function deleteHobby(hobbyId: string, _userId: string): Promise<void> {
+  const ownerUserId = await resolveTargetUserId();
+
   const sessionsQuery = query(
     sessionsCollection,
     where('hobbyId', '==', hobbyId),
-    where('userId', '==', userId)
+    where('userId', '==', ownerUserId)
   );
   const sessionsSnapshot = await getDocs(sessionsQuery);
 
@@ -229,7 +356,7 @@ export async function deleteHobby(hobbyId: string, userId: string): Promise<void
     batch.delete(docSnap.ref);
   });
 
-  batch.update(doc(usersCollection, userId), {
+  batch.update(doc(usersCollection, ownerUserId), {
     hobbies: arrayRemove(hobbyId),
   });
 
@@ -238,13 +365,15 @@ export async function deleteHobby(hobbyId: string, userId: string): Promise<void
 }
 
 export async function createSession(
-  userId: string,
+  _userId: string,
   hobbyId: string,
   date: string,
   durationMinutes: number
 ): Promise<Session> {
+  const ownerUserId = await resolveTargetUserId();
+
   const sessionRef = await addDoc(sessionsCollection, {
-    userId,
+    userId: ownerUserId,
     hobbyId,
     date,
     durationMinutes,
@@ -256,15 +385,17 @@ export async function createSession(
 }
 
 export async function getRecentSessions(
-  userId: string,
+  _userId: string,
   days = DEFAULT_RECENT_DAYS
 ): Promise<SessionWithHobby[]> {
-  const hobbies = await getUserHobbies(userId);
+  const ownerUserId = await resolveTargetUserId();
+
+  const hobbies = await getUserHobbies(ownerUserId);
   const hobbyById = new Map(hobbies.map(hobby => [hobby.id, hobby]));
 
   const sessionsQuery = query(
     sessionsCollection,
-    where('userId', '==', userId),
+    where('userId', '==', ownerUserId),
     orderBy('date', 'desc'),
     limit(MAX_RECENT_SESSIONS_QUERY)
   );
@@ -281,13 +412,17 @@ export async function getRecentSessions(
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
+  await waitForAuth();
+
   await deleteDoc(doc(sessionsCollection, sessionId));
 }
 
-export async function getHobbyStats(hobbyId: string, userId: string): Promise<HobbyStats> {
+export async function getHobbyStats(hobbyId: string, _userId: string): Promise<HobbyStats> {
+  const ownerUserId = await resolveTargetUserId();
+
   const sessionsQuery = query(
     sessionsCollection,
-    where('userId', '==', userId),
+    where('userId', '==', ownerUserId),
     where('hobbyId', '==', hobbyId),
     orderBy('date', 'desc')
   );

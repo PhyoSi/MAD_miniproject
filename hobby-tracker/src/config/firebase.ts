@@ -1,5 +1,21 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { Platform } from 'react-native';
+import * as FirebaseAuth from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const {
+  getAuth,
+  initializeAuth,
+} = FirebaseAuth;
+
+type Auth = FirebaseAuth.Auth;
+
+const getReactNativePersistence = (
+  FirebaseAuth as typeof FirebaseAuth & {
+    getReactNativePersistence: (storage: typeof AsyncStorage) => FirebaseAuth.Persistence;
+  }
+).getReactNativePersistence;
 
 function requireEnv(value: string | undefined, name: string): string {
   if (!value) {
@@ -23,4 +39,20 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
+const createAuth = (): Auth => {
+  if (Platform.OS === 'web') {
+    return getAuth(app);
+  }
+
+  try {
+    return initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch {
+    // Fallback for hot reload / re-initialization cases.
+    return getAuth(app);
+  }
+};
+
+export const auth: Auth = createAuth();
 export const db = getFirestore(app);

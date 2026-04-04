@@ -48,3 +48,7 @@ app-example
 
 # Firebase local cache/state
 .firebase/
+
+*.jks
+*.keystore
+key.properties
