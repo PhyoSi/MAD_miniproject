@@ -4,15 +4,37 @@ import { signInAnon } from '../src/services/auth';
 import { backfillAuthorId } from '../src/utils/migration';
 
 export default function Index() {
-  const [authReady, setAuthReady] = useState(false);
+  const [isReadyToRedirect, setIsReadyToRedirect] = useState(false);
 
   useEffect(() => {
-    signInAnon()
-      .then(() => backfillAuthorId())
-      .then(() => setAuthReady(true));
+    let isMounted = true;
+
+    async function bootstrap() {
+      try {
+        await signInAnon();
+      } catch (error) {
+        console.error('Startup auth failed:', error);
+      }
+
+      try {
+        await backfillAuthorId();
+      } catch (error) {
+        console.warn('Startup migration skipped:', error);
+      } finally {
+        if (isMounted) {
+          setIsReadyToRedirect(true);
+        }
+      }
+    }
+
+    bootstrap();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  if (!authReady) return null;
+  if (!isReadyToRedirect) return null;
 
   return <Redirect href="/splash" />;
 }
