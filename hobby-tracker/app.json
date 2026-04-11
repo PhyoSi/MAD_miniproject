@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "hobby-tracker",
+    "name": "HobbyIt",
     "slug": "hobby-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "hobbytracker",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
