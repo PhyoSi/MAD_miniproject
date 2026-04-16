@@ -1,6 +1,8 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { signInAnon } from '../src/services/auth';
+import LandingScreen from '../src/screens/LandingScreen';
 import { backfillAuthorId } from '../src/utils/migration';
 
 export default function Index() {
@@ -33,6 +35,17 @@ export default function Index() {
       isMounted = false;
     };
   }, []);
+
+  if (Platform.OS === 'web') {
+    return (
+      <LandingScreen
+        isLaunching={!isReadyToRedirect}
+        onLaunch={() => {
+          router.replace('/splash');
+        }}
+      />
+    );
+  }
 
   if (!isReadyToRedirect) return null;
 
