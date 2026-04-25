@@ -7,7 +7,7 @@ export default function SplashBranding() {
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>🎯</Text>
-      <Text style={styles.title}>HobbyIt</Text>
+      <Text style={styles.title}>HobbyItV2</Text>
       <ActivityIndicator animating size="large" color={colors.primary} style={styles.spinner} />
     </View>
   );

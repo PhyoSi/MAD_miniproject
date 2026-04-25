@@ -39,7 +39,7 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenTitleBlock title="Welcome to HobbyIt" subtitle="Track your practice time and streaks." />
+      <ScreenTitleBlock title="Welcome to HobbyItV2" subtitle="Track your practice time and streaks." />
 
       <TextInput
         mode="outlined"
